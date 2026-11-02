@@ -98,22 +98,68 @@ char* strConcatenate(char* src1, char* src2) {
 
 // ========= EJERCICIO 2: FUNCIONES A IMPLEMENTAR (EL TP) =========
 
+void gameBoardDelete(GameBoard* board);   // gameBoardNew la usa para limpiar si falla un malloc
+
 GameBoard* gameBoardNew() {
-    // TODO: Reservar memoria para el GameBoard.
-    // TODO: Usar un bucle para hacer malloc de las 20 filas (RowNode) y conectarlas.
-    // TODO: El puntero first_row debe apuntar al primero de esos nodos.
-    // TODO: Inicializar queue_head, queue_tail y first_particle en NULL.
-    printf("Función gameBoardNew no implementada.\n");
-    return NULL;
+    GameBoard* board = malloc(sizeof(GameBoard));
+    if (board == NULL) return NULL;
+
+    // Todos los punteros arrancan en NULL: asi gameBoardDelete puede liberar
+    // un tablero a medio construir si falla algun malloc de las filas.
+    board->first_row = NULL;
+    board->queue_head = NULL;
+    board->queue_tail = NULL;
+    board->first_particle = NULL;
+    board->current_piece.col = 0;
+    board->current_piece.row = 0;
+    board->current_piece.type = 0;
+    board->current_piece.rotation = 0;
+    board->current_piece.active = 0;
+    board->score = 0;
+    board->tick_timer = 0;
+
+    // Cada fila nueva se inserta en la cabeza (O(1), sin recorrer la lista).
+    // Como todas arrancan vacias, el orden de creacion no importa.
+    for (int i = 0; i < GRID_ROWS; i++) {
+        RowNode* row = malloc(sizeof(RowNode));
+        if (row == NULL) {
+            gameBoardDelete(board);   // libera las filas ya enlazadas y el board
+            return NULL;
+        }
+        for (int c = 0; c < GRID_COLS; c++) row->cells[c] = 0;
+        row->next = board->first_row;
+        board->first_row = row;
+    }
+    return board;
 }
 
 void gameBoardDelete(GameBoard* board) {
-    // TODO: Debe tolerar board == NULL.
-    // TODO: Recorrer y liberar todos los RowNode con free().
-    // TODO: Recorrer y liberar todos los PieceQueueNode.
-    // TODO: Recorrer y liberar todos los ParticleNode.
-    // TODO: Finalmente, liberar la estructura GameBoard.
-    printf("Función gameBoardDelete no implementada.\n");
+    if (board == NULL) return;
+
+    // En las tres listas se guarda el siguiente ANTES del free, porque
+    // despues de liberar el nodo no se puede leer su campo next.
+    RowNode* row = board->first_row;
+    while (row != NULL) {
+        RowNode* next = row->next;
+        free(row);
+        row = next;
+    }
+
+    PieceQueueNode* piece = board->queue_head;
+    while (piece != NULL) {
+        PieceQueueNode* next = piece->next;
+        free(piece);
+        piece = next;
+    }
+
+    ParticleNode* particle = board->first_particle;
+    while (particle != NULL) {
+        ParticleNode* next = particle->next;
+        free(particle);
+        particle = next;
+    }
+
+    free(board);
 }
 
 void gameBoardAddParticle(GameBoard* board, float x, float y, int color) {
@@ -134,17 +180,33 @@ int gameBoardCheckAndClearLines(GameBoard* board) {
 }
 
 void gameBoardEnqueuePiece(GameBoard* board, int type) {
-    // TODO: Crear un PieceQueueNode con el 'type'.
-    // TODO: Insertarlo al final de la cola (queue_tail) y actualizar punteros.
-    printf("Función gameBoardEnqueuePiece no implementada.\n");
+    if (board == NULL) return;
+    PieceQueueNode* node = malloc(sizeof(PieceQueueNode));
+    if (node == NULL) return;   // sin memoria: la pieza se descarta
+    node->type = type;
+    node->next = NULL;          // el nuevo nodo es el ultimo de la cola
+
+    // Gracias a queue_tail se encola en O(1) sin recorrer la lista.
+    // Si la cola estaba vacia, el nodo es a la vez cabeza y cola.
+    if (board->queue_tail == NULL) {
+        board->queue_head = node;
+    } else {
+        board->queue_tail->next = node;
+    }
+    board->queue_tail = node;
 }
 
 int gameBoardDequeuePiece(GameBoard* board, int* out_type) {
-    // TODO: Si la cola está vacía, retornar 0.
-    // TODO: Extraer el primer nodo (queue_head).
-    // TODO: Guardar el type en la variable out_type, liberar el nodo y actualizar el head.
-    printf("Función gameBoardDequeuePiece no implementada.\n");
-    return 0;
+    if (board == NULL || board->queue_head == NULL) return 0;
+
+    PieceQueueNode* node = board->queue_head;
+    *out_type = node->type;
+    board->queue_head = node->next;
+    // Si se saco el ultimo nodo, queue_tail apuntaria a memoria liberada:
+    // hay que dejarlo en NULL junto con queue_head.
+    if (board->queue_head == NULL) board->queue_tail = NULL;
+    free(node);
+    return 1;
 }
 
 // ========= LOGICA DE DIBUJADO Y COLISIONES (NO MODIFICAR) =========
@@ -311,6 +373,39 @@ int inicializar() {
 
 // ========= TESTS (COMPLETAR) =========
 
+void testCola() {
+    GameBoard* board = gameBoardNew();
+    if (board == NULL) {
+        printf("[FAIL] cola: gameBoardNew devolvio NULL\n");
+        return;
+    }
+    int ok = 1;
+    int type;
+
+    // 5 push y 5 pop: deben salir en el mismo orden en que entraron (FIFO)
+    for (int i = 0; i < 5; i++) gameBoardEnqueuePiece(board, i);
+    for (int i = 0; i < 5; i++) {
+        if (!gameBoardDequeuePiece(board, &type) || type != i) ok = 0;
+    }
+
+    // 6to pop: cola vacia, devuelve 0, no toca out_type y deja head/tail en NULL
+    type = -1;
+    if (gameBoardDequeuePiece(board, &type) != 0 || type != -1) ok = 0;
+    if (board->queue_head != NULL || board->queue_tail != NULL) ok = 0;
+
+    // La cola sigue usable despues de vaciarse
+    gameBoardEnqueuePiece(board, 6);
+    if (!gameBoardDequeuePiece(board, &type) || type != 6) ok = 0;
+    if (board->queue_head != NULL || board->queue_tail != NULL) ok = 0;
+
+    printf("[%s] cola: 5 push, 6 pop y push posterior\n", ok ? "OK" : "FAIL");
+
+    // Se dejan piezas encoladas para que gameBoardDelete tambien libere la cola
+    gameBoardEnqueuePiece(board, 1);
+    gameBoardEnqueuePiece(board, 2);
+    gameBoardDelete(board);
+}
+
 void correrTests() {
     // TODO: Implementar los casos minimos del enunciado. Por ejemplo:
     //  - strDuplicate: "", "x", un string con distintos caracteres.
@@ -323,7 +418,7 @@ void correrTests() {
     //    gameBoardCheckAndClearLines y comprobar que first_row es la fila nueva vacia y que
     //    la lista sigue teniendo 20 filas.
     // Liberar toda la memoria pedida en los tests (strings y tableros).
-    printf("Tests no implementados.\n");
+    testCola();
 }
 
 // Compara contra "--test" sin depender de string.h ni del Ejercicio 1.

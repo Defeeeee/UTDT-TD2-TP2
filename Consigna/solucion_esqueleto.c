@@ -2,6 +2,7 @@
 //       ./tetris --test    corre solo los tests (valgrind --leak-check=full ./tetris --test)
 
 #include <SDL2/SDL.h>
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -79,21 +80,93 @@ GameBoard* game_board = NULL;
 // ========= EJERCICIO 1: STRINGS (NO USAR string.h) =========
 
 char* strDuplicate(char* src) {
-    // TODO: Contar los caracteres de src, reservar con malloc (no olvidar el '\0'),
-    //       copiar todo y devolver el puntero nuevo.
-    return NULL;
+    int longitud = 0;
+
+    while (src[longitud] != '\0') {
+        longitud++;
+    }
+
+    // +1 para el '\0', que no se cuenta en longitud pero hay que copiarlo
+    char* copia = malloc(longitud + 1);
+
+    if (copia == NULL) {
+        return NULL;
+    }
+
+    int i = 0;
+
+    while (i < longitud) {
+        copia[i] = src[i];
+        i++;
+    }
+
+    copia[longitud] = '\0';
+
+    return copia;
 }
 
 int strCompare(char* s1, char* s2) {
-    // TODO: Devolver 0 si son iguales, 1 si s1 < s2, -1 si s1 > s2.
-    //       Ojo: es la convencion INVERSA a strcmp.
-    return 0;
+    int i = 0;
+
+    // Avanza mientras coincidan. Si uno es prefijo del otro, frena en su '\0',
+    // que es menor que cualquier caracter: asi el prefijo queda como menor.
+    while (s1[i] == s2[i] && s1[i] != '\0') {
+        i++;
+    }
+
+    if (s1[i] == s2[i]) {
+        return 0;
+    }
+
+    // Se compara como unsigned char (igual que strcmp) para que los caracteres
+    // no ASCII (> 127) no queden negativos y se ordenen antes que 'a'.
+    if ((unsigned char)s1[i] < (unsigned char)s2[i]) {
+        return 1;
+    } else {
+        return -1;
+    }
 }
 
 char* strConcatenate(char* src1, char* src2) {
-    // TODO: Reservar un string nuevo con src1 seguido de src2, y liberar src1 y src2.
-    //       Precondicion: src1 y src2 vienen de malloc y son punteros distintos.
-    return NULL;
+    int longitud1 = 0;
+    while (src1[longitud1] != '\0') {
+        longitud1++;
+    }
+
+    int longitud2 = 0;
+    while (src2[longitud2] != '\0') {
+        longitud2++;
+    }
+
+    // Un solo malloc con el largo total de ambos, mas 1 para el '\0' final
+    char* resultado = malloc(longitud1 + longitud2 + 1);
+
+    if (resultado == NULL) {
+        return NULL;
+    }
+
+    int i = 0;
+    while (i < longitud1) {
+        resultado[i] = src1[i];
+        i++;
+    }
+
+    // i sigue desde donde termino src1: src2 se copia a continuacion
+    int j = 0;
+    while (j < longitud2) {
+        resultado[i] = src2[j];
+        i++;
+        j++;
+    }
+
+    resultado[i] = '\0';
+
+    // Los originales se liberan recien despues de copiarlos.
+    // Precondicion: vienen de malloc y son punteros distintos.
+    free(src1);
+    free(src2);
+
+    return resultado;
 }
 
 // ========= EJERCICIO 2: FUNCIONES A IMPLEMENTAR (EL TP) =========
@@ -373,6 +446,92 @@ int inicializar() {
 
 // ========= TESTS (COMPLETAR) =========
 
+void testStrings() {
+
+    // TESTS DE strDuplicate
+
+    char* copia = strDuplicate("");
+    assert(copia != NULL);
+    assert(copia[0] == '\0');
+    free(copia);
+
+    copia = strDuplicate("A");
+    assert(copia != NULL);
+    assert(copia[0] == 'A');
+    assert(copia[1] == '\0');
+    free(copia);
+
+    char* copiaLarga = strDuplicate("Tecnología");
+    assert(copiaLarga != NULL);
+    assert(strCompare(copiaLarga, "Tecnología") == 0);
+    free(copiaLarga);
+
+
+    // TESTS DE strCompare
+
+    assert(strCompare("Tigre", "Tigre") == 0);
+    assert(strCompare("Gala", "Gato") == 1);
+    assert(strCompare("Tigre", "Leon") == -1);
+    assert(strCompare("casa", "casas") == 1);
+    assert(strCompare("casas", "casa") == -1);
+    assert(strCompare("", "") == 0);
+    assert(strCompare("", "Fede") == 1);
+    assert(strCompare("FedeBanana", "") == -1);
+    assert(strCompare("A", "B") == 1);
+    assert(strCompare("B", "A") == -1);
+
+
+    // TEST 1 DE strConcatenate
+
+    char* texto1 = strDuplicate("Ejemplo1");
+    char* texto2 = strDuplicate("Ejemplo2");
+
+    assert(texto1 != NULL);
+    assert(texto2 != NULL);
+
+    char* resultado = strConcatenate(texto1, texto2);
+
+    assert(resultado != NULL);
+    assert(strCompare(resultado, "Ejemplo1Ejemplo2") == 0);
+
+    free(resultado);
+
+
+    // TEST 2: STRING VACIO
+
+    char* vacio = strDuplicate("");
+    char* texto3 = strDuplicate("ABC");
+
+    assert(vacio != NULL);
+    assert(texto3 != NULL);
+
+    char* resultadoVacio = strConcatenate(vacio, texto3);
+
+    assert(resultadoVacio != NULL);
+    assert(strCompare(resultadoVacio, "ABC") == 0);
+
+    free(resultadoVacio);
+
+
+    // TEST 3: DOS STRINGS DE 5 CARACTERES
+
+    char* palabra1 = strDuplicate("Perro");
+    char* palabra2 = strDuplicate("Feliz");
+
+    assert(palabra1 != NULL);
+    assert(palabra2 != NULL);
+
+    char* resultadoFinal = strConcatenate(palabra1, palabra2);
+
+    assert(resultadoFinal != NULL);
+    assert(strCompare(resultadoFinal, "PerroFeliz") == 0);
+
+    free(resultadoFinal);
+
+
+    printf("[OK] strings: strDuplicate, strCompare y strConcatenate\n");
+}
+
 void testCola() {
     GameBoard* board = gameBoardNew();
     if (board == NULL) {
@@ -418,6 +577,7 @@ void correrTests() {
     //    gameBoardCheckAndClearLines y comprobar que first_row es la fila nueva vacia y que
     //    la lista sigue teniendo 20 filas.
     // Liberar toda la memoria pedida en los tests (strings y tableros).
+    testStrings();
     testCola();
 }
 

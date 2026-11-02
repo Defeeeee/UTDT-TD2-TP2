@@ -1,0 +1,51 @@
+
+//DUPLICAR: FUNCIÓN 1
+
+char* strDuplicate(char* src) {
+    int longitud = 0;
+
+    while (src[longitud] != '\0') {
+        longitud++;
+    }
+
+    char* copia = malloc(longitud + 1);
+
+    if (copia == NULL) {
+        return NULL;
+    }
+
+    int i = 0;
+
+    while (i < longitud) {
+        copia[i] = src[i];
+        i++;
+    }
+
+    copia[longitud] = '\0';
+
+    return copia;
+}
+
+
+
+
+//CONCATENAR: FUNCIÓN 2
+
+
+int strCompare(char* s1, char* s2) {
+    int i = 0;
+
+    while (s1[i] == s2[i] && s1[i] != '\0') {
+        i++;
+    }
+
+    if (s1[i] == s2[i]) {
+        return 0;
+    }
+
+    if (s1[i] < s2[i]) {
+        return 1;
+    } else {
+        return -1;
+    }
+}

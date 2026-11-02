@@ -446,6 +446,13 @@ int inicializar() {
 
 // ========= TESTS (COMPLETAR) =========
 
+// Helper para los tests de tablero: cuenta los RowNode de la lista.
+int contarFilas(GameBoard* board) {
+    // TODO: Recorrer board->first_row siguiendo los next y devolver cuantos nodos hay.
+    //       Los tests de gameBoardCheckAndClearLines lo usan para verificar que quedan 20.
+    return 0;
+}
+
 void testStrings() {
 
     // TESTS DE strDuplicate

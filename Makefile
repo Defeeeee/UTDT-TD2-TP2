@@ -18,9 +18,8 @@ EXEC = tetris
 # Archivos fuente (.c) a compilar.
 # Descomentar la linea correspondiente al archivo que se quiera compilar:
 
-SRCS = juego_base.c
-#SRCS = solucion_esqueleto.c
-#SRCS = tp_resuelto.c
+#SRCS = Consigna/juego_base.c
+SRCS = tp_resuelto.c
 
 # --- Reglas de Compilacion ---
 

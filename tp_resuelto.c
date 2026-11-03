@@ -236,20 +236,89 @@ void gameBoardDelete(GameBoard* board) {
 }
 
 void gameBoardAddParticle(GameBoard* board, float x, float y, int color) {
-    // TODO: Crear un ParticleNode con memoria dinámica.
-    // TODO: Inicializar x, y, velocidades aleatorias y un life_timer.
-    // TODO: Agregarlo al principio de la lista enlazada simple de partículas.
-    printf("Función gameBoardAddParticle no implementada.\n");
+    if (board == NULL) return; //se chequea en gameBoardCheckAndClearLines() (único lugar donde se llama), adicional para independencia
+    ParticleNode* particle = (ParticleNode*) malloc(sizeof(ParticleNode));
+    particle->x = x;
+    particle->y = y;
+    particle->color = color;
+    particle->vel_x = ((rand() % 100) / 10.0f) - 5.0f;
+    particle->vel_y = ((rand() % 50) / -10.0f) - 2.0f; //en negativo primero, "salta" para arriba
+    particle->life_timer = 30 + (rand() % 30);
+
+    //inserción de una nueva partícula al principio de la lista de particulas
+    particle->next = board->first_particle;
+    board->first_particle = particle;
 }
 
 int gameBoardCheckAndClearLines(GameBoard* board) {
-    // TODO: Recorrer la lista de RowNode.
-    // TODO: Si un RowNode tiene todas sus celdas > 0, desenlazarlo y hacer free().
-    // TODO: Crear un nuevo RowNode vacío (lleno de ceros).
-    // TODO: Insertar el nuevo RowNode en la CABEZA del tablero (board->first_row).
-    // TODO: Por cada celda destruida, invocar a gameBoardAddParticle().
-    printf("Función gameBoardCheckAndClearLines no implementada.\n");
-    return 0;
+    if (board == NULL) return 0;
+    int lines_cleared = 0; //la función retornará las líneas completadas
+    
+    int row_index = 0; //variable para calcular la posición de las partículas verticalmente
+    RowNode* row_actual = board->first_row; //tomo la cabeza del board
+    RowNode* prev = NULL; //para la primera fila, no existe ningún previo
+
+    //recorro toda la lista de nodos de línea
+    while (row_actual!=NULL){
+        int is_full = 1; //flag
+
+        //recorro todas las celdas de la línea
+        for (int c = 0; c < GRID_COLS; c++){
+            if (row_actual->cells[c] == 0){
+                //si una celda de la línea no está pintada, no hay que borrarla
+                is_full = 0;
+                break; 
+            }
+        }
+
+        if (is_full){
+            //si hay que borrar la línea actual
+
+            lines_cleared++;
+            float y = OFFSET_Y + row_index * CELL_SIZE + CELL_SIZE/2; //nacimiento del pixel en eje vertical, se calcula una única vez por línea
+
+            //creo las partículas para cada celda
+            for (int c = 0; c<GRID_COLS; c++){
+                float x = OFFSET_X + c * CELL_SIZE + CELL_SIZE/2; //nacimiento del pixel en eje horizontal. + CELL_SIZE/2 permite que aparezca en el centro de la celda
+                gameBoardAddParticle(board, x, y, row_actual->cells[c]);
+            }
+            
+            RowNode* row_borrar = row_actual; //copia de la línea actual
+            //si la fila a borrar es la primera
+            if (prev == NULL) {
+                board->first_row = row_actual->next;
+                row_actual = board->first_row;
+            }
+            //si la fila a borrar es del medio o la última
+            else{
+                prev->next = row_actual->next; //conecto el anterior al posterior
+                row_actual = prev->next;
+            }
+            
+            free(row_borrar);
+
+            //creación de línea vacía e inserción en la cabeza del tablero
+            RowNode* row = malloc(sizeof(RowNode));
+            if (row == NULL) return 0; // chequea si malloc pudo devolver memoria correctamente
+            for (int c = 0; c < GRID_COLS; c++) row->cells[c] = 0;
+            row->next = board->first_row;
+            board->first_row = row;
+
+            //si prev es NULL y se borra e inserta la primera linea, queremos actualizarlo
+            if (prev == NULL) {
+                prev = board->first_row;
+            }
+        }
+
+        else{
+            //si no hay que borrar la línea actual, avanzo normalmente los punteros
+            prev = row_actual;
+            row_actual = row_actual->next;
+        }
+
+        row_index++; //sube tanto si la fila fue borrado como no
+    }
+    return lines_cleared;
 }
 
 void gameBoardEnqueuePiece(GameBoard* board, int type) {
@@ -448,9 +517,14 @@ int inicializar() {
 
 // Helper para los tests de tablero: cuenta los RowNode de la lista.
 int contarFilas(GameBoard* board) {
-    // TODO: Recorrer board->first_row siguiendo los next y devolver cuantos nodos hay.
-    //       Los tests de gameBoardCheckAndClearLines lo usan para verificar que quedan 20.
-    return 0;
+    // Los tests de gameBoardCheckAndClearLines lo usan para verificar que quedan 20.
+    int cant_nodos = 0;
+    RowNode* row = board->first_row;
+    while (row!=NULL){
+        row = row->next;
+        cant_nodos++;
+    }
+    return cant_nodos;
 }
 
 void testStrings() {
@@ -572,6 +646,54 @@ void testCola() {
     gameBoardDelete(board);
 }
 
+void testFilas() {
+    GameBoard* board = gameBoardNew();
+    if (board == NULL) { 
+        printf("[FAIL] filas: gameBoardNew devolvió NULL\n");
+        return;
+    }
+
+    /* ------ Llenado artificial de la última fila (19) devuelve 1, crea una nueva fila en first row y mantiene 20 filas. ------ */
+    RowNode* last_row = getRowAt(board, 19); //accedo a la última fila
+    for (int c = 0; c < GRID_COLS; c++) last_row->cells[c] = 1; //pinto todas las celdas de cualquier color
+    int lineas_completadas = gameBoardCheckAndClearLines(board);
+
+    assert(lineas_completadas == 1); //se borró solo una línea
+
+    for (int c = 0; c < GRID_COLS; c++) {
+        assert(board->first_row->cells[c]==0); //para saber si es nueva, chequeo que cada celda esté limpia
+    }
+
+    assert(contarFilas(board) == 20); //el recuento de filas debe ser 20
+
+    /* ------ Llenado artificial de la primera (0) y la segunda (1) fila devuelve 2 y mantiene 20 filas. ------ */
+    RowNode* row_0 = getRowAt(board, 0); //accedo a la primera fila
+    RowNode* row_1 = getRowAt(board, 1); //accedo a la segunda fila
+    for (int c = 0; c < GRID_COLS; c++){
+        // lleno ambas líneas
+        row_0->cells[c] = 1;
+        row_1->cells[c] = 1;
+    }
+    lineas_completadas = gameBoardCheckAndClearLines(board);
+    
+    assert(lineas_completadas == 2); //se borraron 2 líneas
+    assert(contarFilas(board) == 20); //el recuento de filas debe ser 20
+
+    /* ------ Test adicional: llenado de todas las líneas debe devolver 20 y contar 20------ */
+    RowNode* row_actual = board->first_row;
+    while (row_actual != NULL){
+        for (int c = 0; c < GRID_COLS; c++) row_actual->cells[c] = 1;
+        row_actual = row_actual->next;
+    }
+    lineas_completadas = gameBoardCheckAndClearLines(board);
+
+    assert(lineas_completadas == 20); //se borraron 20 líneas
+    assert(contarFilas(board) == 20); //el recuento de filas debe ser 20    
+
+    printf("[OK] filas: fila 19 llenada; filas 0 y 1 llenadas; y test adicional 20 filas llenadas\n");
+    gameBoardDelete(board);
+}
+
 void correrTests() {
     // TODO: Implementar los casos minimos del enunciado. Por ejemplo:
     //  - strDuplicate: "", "x", un string con distintos caracteres.
@@ -586,6 +708,7 @@ void correrTests() {
     // Liberar toda la memoria pedida en los tests (strings y tableros).
     testStrings();
     testCola();
+    testFilas();
 }
 
 // Compara contra "--test" sin depender de string.h ni del Ejercicio 1.

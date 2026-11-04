@@ -300,7 +300,9 @@ int gameBoardCheckAndClearLines(GameBoard* board) {
 
             //creación de línea vacía e inserción en la cabeza del tablero
             RowNode* row = malloc(sizeof(RowNode));
-            if (row == NULL) return 0; // chequea si malloc pudo devolver memoria correctamente
+            // si malloc falla, las lineas ya borradas no se pueden deshacer: se devuelven
+            // igual para que el puntaje sea correcto (getRowAt/canMove toleran filas faltantes)
+            if (row == NULL) return lines_cleared;
             for (int c = 0; c < GRID_COLS; c++) row->cells[c] = 0;
             row->next = board->first_row;
             board->first_row = row;
@@ -514,10 +516,6 @@ int inicializar() {
     return 1;
 }
 
-
-
-
-
 // ========= TESTS =========
 
 // Helper para los tests de tablero: cuenta los RowNode de la lista.
@@ -661,12 +659,17 @@ void testFilas() {
     /* ------ Llenado artificial de la última fila (19) devuelve 1, crea una nueva fila en first row y mantiene 20 filas. ------ */
     RowNode* last_row = getRowAt(board, 19); //accedo a la última fila
     for (int c = 0; c < GRID_COLS; c++) last_row->cells[c] = 1; //pinto todas las celdas de cualquier color
+    RowNode* viejo_primero = board->first_row; //guardo la cabeza anterior para comparar
     int lineas_completadas = gameBoardCheckAndClearLines(board);
 
     assert(lineas_completadas == 1); //se borró solo una línea
 
+    //la fila nueva tiene que estar arriba de la cabeza anterior (no alcanza con que esté vacía,
+    //porque la vieja fila 0 también lo estaba)
+    assert(board->first_row != viejo_primero);
+    assert(board->first_row->next == viejo_primero);
     for (int c = 0; c < GRID_COLS; c++) {
-        assert(board->first_row->cells[c]==0); //para saber si es nueva, chequeo que cada celda esté limpia
+        assert(board->first_row->cells[c]==0); //y además tiene que estar limpia
     }
 
     assert(contarFilas(board) == 20); //el recuento de filas debe ser 20
@@ -699,18 +702,8 @@ void testFilas() {
     gameBoardDelete(board);
 }
 
-void correrTests() {
-    // TODO: Implementar los casos minimos del enunciado. Por ejemplo:
-    //  - strDuplicate: "", "x", un string con distintos caracteres.
-    //  - strCompare: "" vs "", "a" vs "a", y una desigualdad en ambos sentidos (s1/s2 y s2/s1).
-    //  - strConcatenate: "" + "abc" y "hola " + "mundo". Los argumentos deben crearse con
-    //    strDuplicate, porque strConcatenate los libera (no pasar literales).
-    //  - Cola: 5 push y 6 pop; el 6to debe devolver 0 y dejar queue_head y queue_tail en NULL.
-    //    Verificar tambien que un push posterior funcione.
-    //  - Tablero: llenar la fila de indice 19 (la de abajo), llamar a
-    //    gameBoardCheckAndClearLines y comprobar que first_row es la fila nueva vacia y que
-    //    la lista sigue teniendo 20 filas.
-    // Liberar toda la memoria pedida en los tests (strings y tableros).
+void testContarFilas() {
+    // Board y filas en el stack (sin malloc): solo se prueba el recorrido
     GameBoard tableroPrueba = {0};
 
     // Test 1: tablero sin filas
@@ -728,9 +721,14 @@ void correrTests() {
     // Test 2: tablero con 5 filas
     assert(contarFilas(&tableroPrueba) == 5);
 
+    printf("[OK] contarFilas: lista vacia y lista de 5 filas\n");
+}
 
+// Casos minimos del enunciado. Cada test libera toda la memoria que pide.
+void correrTests() {
     testStrings();
     testCola();
+    testContarFilas();
     testFilas();
 }
 

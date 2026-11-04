@@ -238,6 +238,7 @@ void gameBoardDelete(GameBoard* board) {
 void gameBoardAddParticle(GameBoard* board, float x, float y, int color) {
     if (board == NULL) return; //se chequea en gameBoardCheckAndClearLines() (único lugar donde se llama), adicional para independencia
     ParticleNode* particle = (ParticleNode*) malloc(sizeof(ParticleNode));
+    if (particle == NULL) return;
     particle->x = x;
     particle->y = y;
     particle->color = color;
@@ -513,7 +514,11 @@ int inicializar() {
     return 1;
 }
 
-// ========= TESTS (COMPLETAR) =========
+
+
+
+
+// ========= TESTS =========
 
 // Helper para los tests de tablero: cuenta los RowNode de la lista.
 int contarFilas(GameBoard* board) {
@@ -706,6 +711,24 @@ void correrTests() {
     //    gameBoardCheckAndClearLines y comprobar que first_row es la fila nueva vacia y que
     //    la lista sigue teniendo 20 filas.
     // Liberar toda la memoria pedida en los tests (strings y tableros).
+    GameBoard tableroPrueba = {0};
+
+    // Test 1: tablero sin filas
+    assert(contarFilas(&tableroPrueba) == 0);
+
+    // Creamos una lista de 5 filas
+    RowNode filasPrueba[5] = {0};
+
+    for (int i = 0; i < 4; i++) {
+        filasPrueba[i].next = &filasPrueba[i + 1];
+    }
+
+    tableroPrueba.first_row = &filasPrueba[0];
+
+    // Test 2: tablero con 5 filas
+    assert(contarFilas(&tableroPrueba) == 5);
+
+
     testStrings();
     testCola();
     testFilas();
